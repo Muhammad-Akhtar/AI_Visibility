@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Register a business · AI Visibility{% endblock %}
+
+{% block content %}
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">New profile</p>
+      <h1>Register a business</h1>
+      <p class="lede">This is the entry point for the pipeline. Competitors help Agent 1 invent commercially relevant questions.</p>
+    </div>
+  </header>
+
+  {% if error %}
+    <div class="banner banner-error" role="alert">{{ error }}</div>
+  {% endif %}
+
+  <form class="panel form" method="post" action="{{ url_for('web.new_profile') }}" novalidate>
+    <div class="form-grid">
+      <label>
+        <span>Business name</span>
+        <input type="text" name="name" value="{{ form.name }}" required maxlength="255" placeholder="Surfer SEO" />
+      </label>
+      <label>
+        <span>Domain</span>
+        <input type="text" name="domain" value="{{ form.domain }}" required maxlength="255" placeholder="surferseo.com" />
+      </label>
+      <label class="span-2">
+        <span>Industry</span>
+        <input type="text" name="industry" value="{{ form.industry }}" required maxlength="255" placeholder="SEO Software" />
+      </label>
+      <label class="span-2">
+        <span>Description</span>
+        <textarea name="description" rows="4" required placeholder="AI-powered SEO content optimization tool">{{ form.description }}</textarea>
+      </label>
+      <label class="span-2">
+        <span>Competitors</span>
+        <textarea
+          name="competitors"
+          id="competitors"
+          rows="3"
+          data-chip-field
+          placeholder="clearscope.io, marketmuse.com, frase.io"
+        >{{ form.competitors }}</textarea>
+        <small>Comma or newline separated domains. Same format the API expects.</small>
+      </label>
+    </div>
+    <div class="form-actions">
+      <a class="btn btn-ghost" href="{{ url_for('web.dashboard') }}">Cancel</a>
+      <button class="btn btn-primary" type="submit">Create profile</button>
+    </div>
+  </form>
+{% endblock %}

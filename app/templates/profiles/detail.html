@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import visibility_pill, priority_pill, run_pill %}
+{% from "partials/score_meter.html" import score_meter %}
+
+{% block title %}{{ profile.name }} · AI Visibility{% endblock %}
+
+{% block content %}
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">{{ profile.industry }}</p>
+      <h1>{{ profile.name }}</h1>
+      <p class="lede">
+        <a class="domain-link" href="https://{{ profile.domain }}" target="_blank" rel="noopener">{{ profile.domain }}</a>
+        · {{ profile.description }}
+      </p>
+      {% if profile.competitors %}
+        <ul class="chip-list">
+          {% for domain in profile.competitors %}
+            <li>{{ domain }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+    <button class="btn btn-primary" type="button" data-run-pipeline="{{ profile.uuid }}">
+      {% if last_run %}Run again{% else %}Run pipeline{% endif %}
+    </button>
+  </header>
+
+  <section class="kpi-grid">
+    <article class="kpi">
+      <p>Queries discovered</p>
+      <strong>{{ total_queries }}</strong>
+    </article>
+    <article class="kpi">
+      <p>Avg opportunity</p>
+      <strong>{% if avg_opportunity_score is not none %}{{ avg_opportunity_score | pct }}{% else %}—{% endif %}</strong>
+    </article>
+    <article class="kpi">
+      <p>Visible</p>
+      <strong>{{ visibility.visible }}</strong>
+    </article>
+    <article class="kpi kpi-gap">
+      <p>Visibility gaps</p>
+      <strong>{{ visibility.not_visible }}</strong>
+    </article>
+  </section>
+
+  {% if not last_run %}
+    <section class="panel">
+      <h2 class="panel-title">How the pipeline works</h2>
+      <ol class="agent-board">
+        <li>
+          <span>01</span>
+          <div>
+            <h3>Query Discovery</h3>
+            <p>GPT-4o invents 12–15 buyer questions people ask AI assistants in this space.</p>
+          </div>
+        </li>
+        <li>
+          <span>02</span>
+          <div>
+            <h3>Visibility Scoring</h3>
+            <p>DataForSEO scores volume, difficulty, intent, and whether {{ profile.domain }} appears in the answer.</p>
+          </div>
+        </li>
+        <li>
+          <span>03</span>
+          <div>
+            <h3>Content Recommendations</h3>
+            <p>Gap queries become 3–5 concrete briefs — title, rationale, keywords, priority.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+  {% else %}
+    <section class="split">
+      <article class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Latest run</h2>
+          {{ run_pill(last_run.status) }}
+        </div>
+        <dl class="meta-list">
+          <div>
+            <dt>Discovered</dt>
+            <dd>{{ last_run.queries_discovered }}</dd>
+          </div>
+          <div>
+            <dt>Scored</dt>
+            <dd>{{ last_run.queries_scored }}</dd>
+          </div>
+          <div>
+            <dt>Tokens</dt>
+            <dd>{{ last_run.tokens_used }}</dd>
+          </div>
+          <div>
+            <dt>Finished</dt>
+            <dd>{{ last_run.completed_at | human_dt }}</dd>
+          </div>
+        </dl>
+        {% if last_run.error_message %}
+          <p class="banner banner-error">{{ last_run.error_message }}</p>
+        {% endif %}
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Recent runs</h2>
+        </div>
+        <ul class="run-list">
+          {% for run in recent_runs %}
+            <li>
+              {{ run_pill(run.status) }}
+              <span>{{ run.queries_discovered }} queries · {{ run.tokens_used }} tokens</span>
+              <time>{{ run.started_at | human_dt }}</time>
+            </li>
+          {% endfor %}
+        </ul>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Top opportunity queries</h2>
+        <a class="text-link" href="{{ url_for('web.queries', profile_uuid=profile.uuid) }}">View all</a>
+      </div>
+      {% if not top_queries %}
+        <p class="muted">No queries stored for this profile yet.</p>
+      {% else %}
+        <ul class="query-list">
+          {% for q in top_queries %}
+            <li>
+              <div>
+                <p class="query-text">{{ q.query_text }}</p>
+                <div class="query-meta">
+                  {{ visibility_pill(q.visibility_status) }}
+                  <span>{{ q.estimated_search_volume | volume }} vol</span>
+                  <span>KD {{ q.competitive_difficulty }}</span>
+                  {% if q.search_intent %}<span>{{ q.search_intent }}</span>{% endif %}
+                </div>
+              </div>
+              {{ score_meter(q.opportunity_score) }}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Content briefs</h2>
+        <a class="text-link" href="{{ url_for('web.recommendations', profile_uuid=profile.uuid) }}">View all</a>
+      </div>
+      {% if not recommendations %}
+        <p class="muted">No recommendations yet. Gaps after a successful run appear here.</p>
+      {% else %}
+        <ul class="brief-preview">
+          {% for rec in recommendations %}
+            <li>
+              {{ priority_pill(rec.priority) }}
+              <div>
+                <h3>{{ rec.title }}</h3>
+                <p>{{ rec.content_type | content_type_label }}</p>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}

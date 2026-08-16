@@ -1,0 +1,9 @@
+{% macro score_meter(score) %}
+  {% set pct = ((score or 0) * 100) | round | int %}
+  <div class="meter" title="Opportunity {{ '%.2f'|format(score or 0) }}">
+    <span class="meter-track">
+      <span class="meter-fill" style="width: {{ pct }}%"></span>
+    </span>
+    <span class="meter-label">{{ pct }}</span>
+  </div>
+{% endmacro %}

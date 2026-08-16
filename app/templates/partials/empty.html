@@ -1,0 +1,10 @@
+{% macro empty_state(title, body, href='', label='') %}
+  <section class="empty">
+    <div class="empty-mark" aria-hidden="true"></div>
+    <h2>{{ title }}</h2>
+    <p>{{ body }}</p>
+    {% if href and label %}
+      <a class="btn btn-primary" href="{{ href }}">{{ label }}</a>
+    {% endif %}
+  </section>
+{% endmacro %}

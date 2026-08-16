@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}{{ status }} · AI Visibility{% endblock %}
+
+{% block content %}
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">Error {{ status }}</p>
+      <h1>We couldn’t find that page.</h1>
+      <p class="lede">{{ message }}</p>
+      <a class="btn btn-primary" href="{{ url_for('web.dashboard') }}">Back to profiles</a>
+    </div>
+  </header>
+{% endblock %}

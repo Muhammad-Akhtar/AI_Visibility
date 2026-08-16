@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% from "partials/empty.html" import empty_state %}
+{% from "partials/macros.html" import visibility_pill %}
+{% from "partials/score_meter.html" import score_meter %}
+
+{% block title %}Queries · {{ profile.name }}{% endblock %}
+
+{% block content %}
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">{{ profile.name }}</p>
+      <h1>Discovered queries</h1>
+      <p class="lede">Sorted by opportunity. Filter the same way the API does: minimum score and visibility status.</p>
+    </div>
+    <button class="btn btn-primary" type="button" data-run-pipeline="{{ profile.uuid }}">Run pipeline</button>
+  </header>
+
+  <form class="filters" method="get">
+    <label>
+      <span>Min score</span>
+      <input
+        type="number"
+        name="min_score"
+        min="0"
+        max="1"
+        step="0.05"
+        value="{% if min_score is not none %}{{ min_score }}{% endif %}"
+        placeholder="0.5"
+      />
+    </label>
+    <label>
+      <span>Visibility</span>
+      <select name="status">
+        <option value="" {% if not status %}selected{% endif %}>Any</option>
+        <option value="visible" {% if status == "visible" %}selected{% endif %}>Visible</option>
+        <option value="not_visible" {% if status == "not_visible" %}selected{% endif %}>Gap</option>
+        <option value="unknown" {% if status == "unknown" %}selected{% endif %}>Unknown</option>
+      </select>
+    </label>
+    <button class="btn btn-ghost" type="submit">Apply</button>
+    <a class="btn btn-ghost" href="{{ url_for('web.queries', profile_uuid=profile.uuid) }}">Reset</a>
+  </form>
+
+  {% if not queries %}
+    {{ empty_state(
+      "No queries match",
+      "Run the pipeline for this profile, or loosen the filters.",
+      url_for('web.profile_detail', profile_uuid=profile.uuid),
+      "Back to overview"
+    ) }}
+  {% else %}
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Query</th>
+            <th>Volume</th>
+            <th>Difficulty</th>
+            <th>Opportunity</th>
+            <th>Intent</th>
+            <th>Visibility</th>
+            <th>Discovered</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for q in queries %}
+            <tr data-query-row="{{ q.uuid }}">
+              <td>
+                <p class="query-text">{{ q.query_text }}</p>
+                {% if q.seed_keyword %}<p class="muted seed">{{ q.seed_keyword }}</p>{% endif %}
+              </td>
+              <td>{{ q.estimated_search_volume | volume }}</td>
+              <td>{{ q.competitive_difficulty }}</td>
+              <td>{{ score_meter(q.opportunity_score) }}</td>
+              <td>{{ q.search_intent or "—" }}</td>
+              <td>
+                {{ visibility_pill(q.visibility_status) }}
+                {% if q.visibility_position %}
+                  <span class="muted">#{{ q.visibility_position }}</span>
+                {% endif %}
+              </td>
+              <td class="nowrap">{{ q.discovered_at | human_dt }}</td>
+              <td>
+                <button
+                  class="btn btn-small"
+                  type="button"
+                  data-recheck="{{ q.uuid }}"
+                >
+                  Recheck
+                </button>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="pager">
+      <p>{{ total }} quer{{ 'y' if total == 1 else 'ies' }}</p>
+      <div>
+        {% if page > 1 %}
+          <a
+            class="btn btn-ghost"
+            href="{{ url_for('web.queries', profile_uuid=profile.uuid, page=page-1, **filter_args) }}"
+          >
+            Previous
+          </a>
+        {% endif %}
+        <span>Page {{ page }} of {{ page_count }}</span>
+        {% if page < page_count %}
+          <a
+            class="btn btn-ghost"
+            href="{{ url_for('web.queries', profile_uuid=profile.uuid, page=page+1, **filter_args) }}"
+          >
+            Next
+          </a>
+        {% endif %}
+      </div>
+    </nav>
+  {% endif %}
+{% endblock %}

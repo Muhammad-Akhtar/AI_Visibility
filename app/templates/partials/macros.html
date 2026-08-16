@@ -1,0 +1,12 @@
+{% macro visibility_pill(status) %}
+  {% set kind = status or "unknown" %}
+  <span class="pill pill-{{ kind }}">{{ kind | status_label }}</span>
+{% endmacro %}
+
+{% macro priority_pill(priority) %}
+  <span class="pill pill-priority-{{ priority }}">{{ (priority or "medium") | capitalize }}</span>
+{% endmacro %}
+
+{% macro run_pill(status) %}
+  <span class="pill pill-run-{{ status }}">{{ status | status_label }}</span>
+{% endmacro %}

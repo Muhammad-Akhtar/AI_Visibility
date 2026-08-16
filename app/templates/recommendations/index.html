@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "partials/empty.html" import empty_state %}
+{% from "partials/macros.html" import priority_pill, visibility_pill %}
+
+{% block title %}Recommendations · {{ profile.name }}{% endblock %}
+
+{% block content %}
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">{{ profile.name }}</p>
+      <h1>Content recommendations</h1>
+      <p class="lede">
+        Agent 3 turns the highest-opportunity gaps into briefs. {{ total }} brief{{ '' if total == 1 else 's' }} on file.
+      </p>
+    </div>
+  </header>
+
+  {% if total == 0 %}
+    {{ empty_state(
+      "No briefs yet",
+      "Run the pipeline. Recommendations appear for queries where this domain is not visible.",
+      url_for('web.profile_detail', profile_uuid=profile.uuid),
+      "Back to overview"
+    ) }}
+  {% else %}
+    {% for priority in ("high", "medium", "low") %}
+      {% if grouped[priority] %}
+        <section class="priority-block">
+          <h2 class="section-label">{{ priority | capitalize }} priority</h2>
+          <div class="brief-grid">
+            {% for item in grouped[priority] %}
+              {% set rec = item.rec %}
+              {% set q = item.query %}
+              <article class="brief-card">
+                <div class="brief-card-top">
+                  {{ priority_pill(rec.priority) }}
+                  <span class="type-tag">{{ rec.content_type | content_type_label }}</span>
+                </div>
+                <h3>{{ rec.title }}</h3>
+                <p class="rationale">{{ rec.rationale }}</p>
+                {% if rec.target_keywords %}
+                  <ul class="chip-list">
+                    {% for kw in rec.target_keywords %}
+                      <li>{{ kw }}</li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+                <footer class="brief-foot">
+                  <p class="query-text">{{ q.query_text }}</p>
+                  {{ visibility_pill(q.visibility_status) }}
+                </footer>
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endblock %}

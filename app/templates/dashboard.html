@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% from "partials/empty.html" import empty_state %}
+{% from "partials/macros.html" import run_pill %}
+{% from "partials/score_meter.html" import score_meter %}
+
+{% block title %}Profiles · AI Visibility{% endblock %}
+
+{% block content %}
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">AI Visibility Intelligence</p>
+      <h1>See which questions you own — and which you don’t.</h1>
+      <p class="lede">
+        Register a business, run the three-agent pipeline, and rank the queries where
+        appearing in AI answers would matter most.
+      </p>
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('web.new_profile') }}">Register a business</a>
+  </header>
+
+  {% if not cards %}
+    {{ empty_state(
+      "No businesses yet",
+      "Start with a domain, industry, and a few competitors. The pipeline discovers buyer questions, scores the visibility gap, then drafts content briefs.",
+      url_for('web.new_profile'),
+      "Register a business"
+    ) }}
+  {% else %}
+    <section class="card-grid">
+      {% for card in cards %}
+        {% set p = card.profile %}
+        <a class="profile-card" href="{{ url_for('web.profile_detail', profile_uuid=p.uuid) }}">
+          <div class="profile-card-top">
+            <h2>{{ p.name }}</h2>
+            {% if card.last_run %}
+              {{ run_pill(card.last_run.status) }}
+            {% else %}
+              <span class="pill pill-run-created">Not run</span>
+            {% endif %}
+          </div>
+          <p class="domain">{{ p.domain }}</p>
+          <p class="muted">{{ p.industry }}</p>
+          <dl class="stat-row">
+            <div>
+              <dt>Queries</dt>
+              <dd>{{ card.total_queries }}</dd>
+            </div>
+            <div>
+              <dt>Avg opportunity</dt>
+              <dd>
+                {% if card.avg_opportunity_score is not none %}
+                  {{ card.avg_opportunity_score | pct }}
+                {% else %}
+                  —
+                {% endif %}
+              </dd>
+            </div>
+          </dl>
+          {% if card.avg_opportunity_score is not none %}
+            {{ score_meter(card.avg_opportunity_score) }}
+          {% endif %}
+        </a>
+      {% endfor %}
+    </section>
+  {% endif %}
+{% endblock %}
