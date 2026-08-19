@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app.extensions import db
-from app.models import DiscoveredQuery, PipelineRun
+from app.models import DiscoveredQuery, PipelineRun, ContentRecommendation
 from app.services.pipeline import Pipeline
 from tests.test_pipeline import FakeDiscovery, FakeRecommendation, FakeScoring
 
@@ -162,3 +162,6 @@ def test_recheck_query(client, profile, monkeypatch):
     assert body["estimated_search_volume"] == 1200
     assert body["visibility_status"] == "not_visible"
     assert body["opportunity_score"] == 0.81
+    recs = db.session.query(ContentRecommendation).filter_by(query_uuid=query.uuid).all()
+    assert len(recs) == 1
+    assert recs[0].title == "Best SEO Content Optimization Tools Compared"

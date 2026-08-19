@@ -2,7 +2,50 @@
 
 from __future__ import annotations
 
-from app.services.dataforseo import DataForSEOClient
+import httpx
+
+from app.config import DATAFORSEO_PRODUCTION_BASE_URL
+from app.services.dataforseo import (
+    DataForSEOClient,
+    SEARCH_VOLUME_PATH,
+)
+
+
+def test_client_defaults_to_production_base_url():
+    client = DataForSEOClient(login="user", password="pass")
+    assert client.base_url == DATAFORSEO_PRODUCTION_BASE_URL
+
+
+def test_client_uses_sandbox_base_url_from_config(app):
+    app.config["DATAFORSEO_BASE_URL"] = "https://sandbox.dataforseo.com/v3"
+    with app.app_context():
+        client = DataForSEOClient(login="user", password="pass")
+    assert client.base_url == "https://sandbox.dataforseo.com/v3"
+
+
+def test_post_uses_configured_base_url(app, monkeypatch):
+    app.config["DATAFORSEO_BASE_URL"] = "https://sandbox.dataforseo.com/v3"
+    captured: dict[str, str] = {}
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {"tasks": [{"status_code": 20000, "result": []}]}
+
+        text = ""
+
+    def fake_post(url, **kwargs):
+        captured["url"] = url
+        return FakeResponse()
+
+    monkeypatch.setattr(httpx.Client, "post", fake_post)
+
+    with app.app_context():
+        client = DataForSEOClient(login="user", password="pass")
+        client.fetch_search_volume(["best seo tool"])
+
+    assert captured["url"] == f"https://sandbox.dataforseo.com/v3{SEARCH_VOLUME_PATH}"
 
 
 def test_organic_rank_counts_as_visible(monkeypatch):

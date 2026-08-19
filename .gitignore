@@ -34,6 +34,7 @@ htmlcov/
 instance/
 *.db
 *.sqlite3
+pipeline_logs/
 
 # OS
 .DS_Store
@@ -45,3 +46,6 @@ Desktop.ini
 .vscode/
 *.swp
 *.swo
+
+pipeline_logs/*
+PIPELINE_WORKFLOW.TXT

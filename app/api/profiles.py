@@ -19,6 +19,12 @@ from app.extensions import db, limiter
 from app.models import BusinessProfile, ContentRecommendation, DiscoveredQuery
 from app.schemas import ProfileCreate
 from app.services.pipeline import Pipeline
+from app.utils.api_debug import (
+    end_pipeline_log,
+    print_api_request,
+    print_api_response,
+    start_pipeline_log,
+)
 
 profiles_bp = Blueprint("profiles", __name__)
 
@@ -103,22 +109,41 @@ def get_profile(profile_uuid: str):
 @profiles_bp.route("/<profile_uuid>/run", methods=["POST"])
 @limiter.limit("5 per hour")
 def run_pipeline(profile_uuid: str):
-    profile = _get_profile(profile_uuid)
-    run = Pipeline().run(profile)
-    top_queries = (
-        db.session.query(DiscoveredQuery)
-        .filter_by(run_uuid=run.uuid)
-        .order_by(DiscoveredQuery.opportunity_score.desc())
-        .limit(3)
-        .all()
-    )
-    recommendations = (
-        db.session.query(ContentRecommendation)
-        .filter_by(run_uuid=run.uuid)
-        .order_by(ContentRecommendation.created_at.asc())
-        .all()
-    )
-    return jsonify(serialize_run_summary(run, top_queries, recommendations))
+    start_pipeline_log(mode="run", run_id=profile_uuid, profile_uuid=profile_uuid)
+    try:
+        print_api_request(
+            provider="Internal (Flask)",
+            operation="Run Pipeline",
+            method="POST",
+            url=f"/api/v1/profiles/{profile_uuid}/run",
+            payload={"profile_uuid": profile_uuid},
+        )
+        profile = _get_profile(profile_uuid)
+        run = Pipeline().run(profile)
+        top_queries = (
+            db.session.query(DiscoveredQuery)
+            .filter_by(run_uuid=run.uuid)
+            .order_by(DiscoveredQuery.opportunity_score.desc())
+            .limit(3)
+            .all()
+        )
+        recommendations = (
+            db.session.query(ContentRecommendation)
+            .filter_by(run_uuid=run.uuid)
+            .order_by(ContentRecommendation.created_at.asc())
+            .all()
+        )
+        response_body = serialize_run_summary(run, top_queries, recommendations)
+        print_api_response(
+            provider="Internal (Flask)",
+            operation="Run Pipeline",
+            url=f"/api/v1/profiles/{profile_uuid}/run",
+            status=200,
+            response=response_body,
+        )
+        return jsonify(response_body)
+    finally:
+        end_pipeline_log()
 
 
 @profiles_bp.route("/<profile_uuid>/queries", methods=["GET"])

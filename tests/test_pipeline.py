@@ -129,6 +129,38 @@ def test_pipeline_persists_partial_scoring_and_recommendations(app, profile):
     assert profile.status == "processed"
 
 
+def test_pipeline_skips_agent3_for_unknown_queries(app, profile):
+    class UnknownOnlyScoring:
+        last_tokens = 0
+
+        def score_queries(self, queries, domain, brand_name, run_uuid="-"):
+            return [
+                ScoredQuery(
+                    query_text=item.query_text,
+                    seed_keyword=item.seed_keyword,
+                    estimated_search_volume=500,
+                    competitive_difficulty=40,
+                    search_intent="commercial",
+                    commercial_intent_score=0.85,
+                    domain_visible=None,
+                    visibility_position=None,
+                    visibility_status="unknown",
+                    opportunity_score=0.65,
+                )
+                for item in queries
+            ]
+
+    pipeline = Pipeline(
+        discovery=FakeDiscovery(),
+        scoring=UnknownOnlyScoring(),
+        recommendation=FakeRecommendation(),
+    )
+    run = pipeline.run(profile)
+    assert run.status == "completed"
+    recs = db.session.query(ContentRecommendation).filter_by(profile_uuid=profile.uuid).all()
+    assert len(recs) == 0
+
+
 def test_pipeline_marks_failed_when_discovery_raises(app, profile):
     pipeline = Pipeline(
         discovery=ExplodingDiscovery(),

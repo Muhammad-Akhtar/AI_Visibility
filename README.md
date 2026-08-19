@@ -31,6 +31,8 @@ Fill in `.env`:
 |---|---|
 | `OPENAI_API_KEY` | GPT-4o for Agents 1 and 3 |
 | `DATAFORSEO_LOGIN` / `DATAFORSEO_PASSWORD` | API credentials from [DataForSEO API access](https://app.dataforseo.com/api-access) |
+| `DATAFORSEO_SANDBOX` | Set to `true` to route all DataForSEO calls to the free sandbox (see `SANDBOX_BASE_URL`) |
+| `SANDBOX_BASE_URL` | Sandbox API root (default `https://sandbox.dataforseo.com/v3`) |
 | `DATABASE_URL` | PostgreSQL URL (the docker-compose default matches `.env.example`) |
 | `SECRET_KEY` | Flask secret |
 
@@ -75,7 +77,7 @@ Health check: `GET http://localhost:5000/health`
 | `POST` | `/api/v1/profiles/{profile_uuid}/run` | Full pipeline (rate-limited: 5/hour/IP) |
 | `GET` | `/api/v1/profiles/{profile_uuid}/queries` | `min_score`, `status=visible\|not_visible\|unknown`, `page`, `per_page` |
 | `GET` | `/api/v1/profiles/{profile_uuid}/recommendations` | Agent 3 output |
-| `POST` | `/api/v1/queries/{query_uuid}/recheck` | Re-run Agent 2 for one query |
+| `POST` | `/api/v1/queries/{query_uuid}/recheck` | Re-run Agent 2 for one query; refresh recommendations if still a gap |
 
 Authentication is not Implemented:
 
@@ -132,7 +134,7 @@ Agents are independently constructible (inject an OpenAI client or a DataForSEO 
 
 A domain counts as **visible** if it appears in organic results **or** in Google AI Overview citations / overview text. `visibility_position` is the organic rank when ranked, otherwise the AI Overview citation index. If a single SERP call fails, that query is stored as `visibility_status=unknown` and the rest of the batch continues.
 
-**Agent 3** only sees gap queries (`not_visible`), ranked by opportunity. Invalid recommendation items are dropped; a total Agent 3 failure does not fail the run — queries are already saved.
+**Agent 3** sees confirmed gap queries (`not_visible` only), ranked by opportunity. Invalid recommendation items are dropped; a total Agent 3 failure does not fail the run — queries are already saved. **Recheck** re-runs Agent 2 and, when visibility is confirmed `not_visible`, refreshes Agent 3 recommendations for that query.
 
 LLM JSON handling: `response_format=json_object`, Pydantic validation, one repair retry that includes the validation error, then a typed `AgentOutputError`. The pipeline does not crash on malformed model output.
 

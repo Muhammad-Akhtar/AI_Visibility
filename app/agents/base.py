@@ -9,9 +9,12 @@ from flask import current_app, has_app_context
 from openai import OpenAI
 from pydantic import BaseModel, ValidationError
 
+from app.utils.api_debug import print_api_request, print_api_response
 from app.utils.json import JSONParseError, parse_llm_json
 
 logger = logging.getLogger("app.agents")
+
+OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -77,6 +80,23 @@ class BaseAgent:
                 ) from second_error
 
     def _chat(self, system_prompt: str, user_prompt: str) -> tuple[str, int]:
+        payload = {
+            "model": self.model,
+            "temperature": self.temperature,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        }
+        print_api_request(
+            provider="OpenAI",
+            operation=f"{self.name} — chat.completions.create",
+            method="POST",
+            url=OPENAI_CHAT_URL,
+            payload=payload,
+            extra={"auth": "Bearer OPENAI_API_KEY from env"},
+        )
         response = self.client.chat.completions.create(
             model=self.model,
             temperature=self.temperature,
@@ -90,6 +110,21 @@ class BaseAgent:
         tokens = 0
         if response.usage is not None:
             tokens = int(response.usage.total_tokens or 0)
+        print_api_response(
+            provider="OpenAI",
+            operation=f"{self.name} — chat.completions.create",
+            url=OPENAI_CHAT_URL,
+            status=200,
+            response={
+                "model": response.model,
+                "content": content,
+                "usage": {
+                    "prompt_tokens": getattr(response.usage, "prompt_tokens", None),
+                    "completion_tokens": getattr(response.usage, "completion_tokens", None),
+                    "total_tokens": tokens,
+                },
+            },
+        )
         return content, tokens
 
     @staticmethod

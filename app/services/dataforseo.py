@@ -10,15 +10,16 @@ from typing import Any
 import httpx
 from flask import current_app, has_app_context
 
+from app.config import DATAFORSEO_PRODUCTION_BASE_URL, dataforseo_base_url
+from app.utils.api_debug import print_api_request, print_api_response
 from app.utils.domain import domains_match, normalize_domain
 
 logger = logging.getLogger("app.dataforseo")
 
-BASE_URL = "https://api.dataforseo.com"
-SEARCH_VOLUME_PATH = "/v3/keywords_data/google_ads/search_volume/live"
-KEYWORD_DIFFICULTY_PATH = "/v3/dataforseo_labs/google/bulk_keyword_difficulty/live"
-SEARCH_INTENT_PATH = "/v3/dataforseo_labs/google/search_intent/live"
-SERP_ADVANCED_PATH = "/v3/serp/google/organic/live/advanced"
+SEARCH_VOLUME_PATH = "/keywords_data/google_ads/search_volume/live"
+KEYWORD_DIFFICULTY_PATH = "/dataforseo_labs/google/bulk_keyword_difficulty/live"
+SEARCH_INTENT_PATH = "/dataforseo_labs/google/search_intent/live"
+SERP_ADVANCED_PATH = "/serp/google/organic/live/advanced"
 
 DEFAULT_LOCATION = 2840  # United States
 DEFAULT_LANGUAGE = "en"
@@ -53,6 +54,7 @@ class DataForSEOClient:
         password: str | None = None,
         location_code: int | None = None,
         language_code: str | None = None,
+        base_url: str | None = None,
         timeout: float = REQUEST_TIMEOUT,
     ) -> None:
         if has_app_context():
@@ -66,10 +68,17 @@ class DataForSEOClient:
             language_code = language_code or current_app.config.get(
                 "DATAFORSEO_LANGUAGE_CODE", DEFAULT_LANGUAGE
             )
+            if base_url is None:
+                base_url = current_app.config.get(
+                    "DATAFORSEO_BASE_URL", DATAFORSEO_PRODUCTION_BASE_URL
+                )
+        if base_url is None:
+            base_url = dataforseo_base_url()
         self.login = login or ""
         self.password = password or ""
         self.location_code = int(location_code or DEFAULT_LOCATION)
         self.language_code = language_code or DEFAULT_LANGUAGE
+        self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
     def require_credentials(self) -> None:
@@ -78,9 +87,26 @@ class DataForSEOClient:
                 "DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD must be set in the environment"
             )
 
-    def _post(self, path: str, payload: list[dict[str, Any]]) -> dict[str, Any]:
+    def _post(
+        self,
+        path: str,
+        payload: list[dict[str, Any]],
+        *,
+        operation: str,
+    ) -> dict[str, Any]:
         self.require_credentials()
-        url = f"{BASE_URL}{path}"
+        url = f"{self.base_url}{path}"
+        print_api_request(
+            provider="DataForSEO",
+            operation=operation,
+            method="POST",
+            url=url,
+            payload=payload,
+            extra={
+                "auth": "HTTP Basic (login/password from env)",
+                "base_url": self.base_url,
+            },
+        )
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 response = client.post(
@@ -90,16 +116,47 @@ class DataForSEOClient:
                     headers={"Content-Type": "application/json"},
                 )
         except httpx.HTTPError as exc:
+            print_api_response(
+                provider="DataForSEO",
+                operation=operation,
+                url=url,
+                status="error",
+                error=str(exc),
+            )
             raise DataForSEOError(f"DataForSEO request failed: {exc}") from exc
 
         if response.status_code >= 400:
+            print_api_response(
+                provider="DataForSEO",
+                operation=operation,
+                url=url,
+                status=response.status_code,
+                error=response.text[:300],
+            )
             raise DataForSEOError(
                 f"DataForSEO HTTP {response.status_code} for {path}: {response.text[:300]}"
             )
         try:
-            return response.json()
+            body = response.json()
         except ValueError as exc:
+            print_api_response(
+                provider="DataForSEO",
+                operation=operation,
+                url=url,
+                status=response.status_code,
+                error="Non-JSON response body",
+                response=response.text[:500],
+            )
             raise DataForSEOError("DataForSEO returned non-JSON body") from exc
+
+        print_api_response(
+            provider="DataForSEO",
+            operation=operation,
+            url=url,
+            status=response.status_code,
+            response=body,
+        )
+        return body
 
     def _first_task(self, body: dict[str, Any]) -> dict[str, Any] | None:
         tasks = body.get("tasks") or []
@@ -125,7 +182,11 @@ class DataForSEOClient:
                 "language_code": self.language_code,
             }
         ]
-        body = self._post(SEARCH_VOLUME_PATH, payload)
+        body = self._post(
+            SEARCH_VOLUME_PATH,
+            payload,
+            operation="Google Ads Search Volume (live)",
+        )
         task = self._first_task(body)
         results: dict[str, int] = {}
         for item in (task or {}).get("result") or []:
@@ -145,7 +206,11 @@ class DataForSEOClient:
                 "language_code": self.language_code,
             }
         ]
-        body = self._post(KEYWORD_DIFFICULTY_PATH, payload)
+        body = self._post(
+            KEYWORD_DIFFICULTY_PATH,
+            payload,
+            operation="Bulk Keyword Difficulty (live)",
+        )
         task = self._first_task(body)
         results: dict[str, int] = {}
         for group in (task or {}).get("result") or []:
@@ -165,7 +230,11 @@ class DataForSEOClient:
                 "language_code": self.language_code,
             }
         ]
-        body = self._post(SEARCH_INTENT_PATH, payload)
+        body = self._post(
+            SEARCH_INTENT_PATH,
+            payload,
+            operation="Search Intent (live)",
+        )
         task = self._first_task(body)
         results: dict[str, tuple[str, float]] = {}
         for group in (task or {}).get("result") or []:
@@ -237,7 +306,11 @@ class DataForSEOClient:
             }
         ]
         try:
-            body = self._post(SERP_ADVANCED_PATH, payload)
+            body = self._post(
+                SERP_ADVANCED_PATH,
+                payload,
+                operation=f"SERP Advanced / visibility check (live) — {query_text!r}",
+            )
         except DataForSEOError:
             logger.exception("dataforseo.serp_failed query=%s", query_text)
             return VisibilityResult(
